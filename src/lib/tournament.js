@@ -42,5 +42,15 @@ export const seedBracket = teams => {
   const n = teams.length
   const slots = []
   for (let i = 0; i < n/2; i++) slots.push([teams[i], teams[n-1-i]])
-  return slots.map((pair, i) => ({ id: `R16-${i+1}`, a: pair[0] || null, b: pair[1] || null, winner: null }))
+  
+  // Determine the round name based on team count
+  let roundName = 'R16'
+  if (n >= 64) roundName = 'R64'
+  else if (n >= 32) roundName = 'R32'
+  else if (n >= 16) roundName = 'R16'
+  else if (n >= 8) roundName = 'R8'
+  else if (n >= 4) roundName = 'R4'
+  else roundName = 'R2'
+  
+  return slots.map((pair, i) => ({ id: `${roundName}-${i+1}`, a: pair[0] || null, b: pair[1] || null, winner: null }))
 }

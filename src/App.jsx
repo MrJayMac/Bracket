@@ -8,7 +8,7 @@ import { save, load } from './lib/storage'
 
 export default function App() {
   const [tab, setTab] = useState('setup')
-  const [config, setConfig] = useState(load('cfg', { teamCount: 32, groupSize: 4, perGroup: 2 }))
+  const [config, setConfig] = useState(load('cfg', { teamCount: 32, groupSize: 4, perGroup: 2, format: 'groups' }))
   const [teams, setTeams] = useState(load('teams', Array.from({length: config.teamCount}, (_,i)=>({id:i+1, name:`Team ${i+1}`}))))
   const [fixtures, setFixtures] = useState(load('fixtures', []))
   const [bracket, setBracket] = useState(load('bracket', { r16: [], qf: [], sf: [], f: [] }))
@@ -27,7 +27,7 @@ export default function App() {
   }, [config, teams, fixtures, bracket])
 
   const reset = () => {
-    setConfig({ teamCount: 32, groupSize: 4, perGroup: 2 })
+    setConfig({ teamCount: 32, groupSize: 4, perGroup: 2, format: 'groups' })
     setTeams(Array.from({length: 32}, (_,i)=>({id:i+1, name:`Team ${i+1}`})))
     setFixtures([])
     setBracket({ r16: [], qf: [], sf: [], f: [] })
@@ -43,11 +43,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header tab={tab} setTab={setTab} onReset={reset} />
+      <Header tab={tab} setTab={setTab} onReset={reset} config={config} />
       <div className="container">
         {tab === 'setup' && <Setup config={config} setConfig={setConfig} setTeams={setTeams} teams={teams} />}
-        {tab === 'groups' && <Groups teams={teams} groupSize={config.groupSize} fixtures={fixtures} setFixtures={setFixtures} />}
-        {tab === 'bracket' && <Bracket groupsConfig={groupsConfig} fixtures={fixtures} bracket={bracket} setBracket={setBracket} />}
+        {tab === 'groups' && config.format === 'groups' && <Groups teams={teams} groupSize={config.groupSize} fixtures={fixtures} setFixtures={setFixtures} />}
+        {tab === 'bracket' && <Bracket groupsConfig={groupsConfig} fixtures={fixtures} bracket={bracket} setBracket={setBracket} config={config} teams={teams} />}
       </div>
     </div>
   )

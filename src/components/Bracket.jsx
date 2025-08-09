@@ -1,54 +1,102 @@
 import React, { useEffect, useMemo } from 'react'
 import { qualifiersFromGroups, seedBracket } from '../lib/tournament'
 
-export default function Bracket({ groupsConfig, fixtures, bracket, setBracket }) {
-  const qualifiers = useMemo(()=>qualifiersFromGroups(groupsConfig.groups, fixtures, groupsConfig.perGroup), [groupsConfig, fixtures])
+export default function Bracket({ groupsConfig, fixtures, bracket, setBracket, config, teams }) {
+  const qualifiers = useMemo(() => {
+    if (config.format === 'direct') {
+      return teams || []
+    }
+    return qualifiersFromGroups(groupsConfig.groups, fixtures, groupsConfig.perGroup)
+  }, [config.format, teams, groupsConfig, fixtures])
+  
   const seeded = useMemo(()=>seedBracket(qualifiers), [qualifiers])
 
+  // Determine the bracket structure based on team count
+  const bracketStructure = useMemo(() => {
+    const n = qualifiers.length
+    const rounds = []
+    
+    if (n >= 64) rounds.push({ key: 'r64', title: 'Round of 64' })
+    if (n >= 32) rounds.push({ key: 'r32', title: 'Round of 32' })
+    if (n >= 16) rounds.push({ key: 'r16', title: 'Round of 16' })
+    if (n >= 8) rounds.push({ key: 'qf', title: 'Quarterfinals' })
+    if (n >= 4) rounds.push({ key: 'sf', title: 'Semifinals' })
+    if (n >= 2) rounds.push({ key: 'f', title: 'Final' })
+    
+    return rounds
+  }, [qualifiers.length])
+
+  const initialRoundKey = bracketStructure[0]?.key || 'f'
+
   useEffect(()=>{
-    if (!bracket.r16.length && seeded.length) setBracket({ ...bracket, r16: seeded })
-  }, [seeded])
+    if (!bracket[initialRoundKey]?.length && seeded.length) {
+      const newBracket = { ...bracket }
+      // Initialize all rounds as empty arrays
+      bracketStructure.forEach(round => {
+        newBracket[round.key] = []
+      })
+      // Set the initial round with seeded teams
+      newBracket[initialRoundKey] = seeded
+      setBracket(newBracket)
+    }
+  }, [seeded, initialRoundKey, bracketStructure])
 
   const pick = (round, id, winner) => {
     const next = { ...bracket }
     next[round] = next[round].map(m => m.id === id ? { ...m, winner } : m)
-    const order = ['r16','qf','sf','f']
-    const ri = order.indexOf(round)
-    if (ri !== -1 && ri < order.length - 1) {
+    
+    // Use dynamic bracket structure instead of hardcoded order
+    const roundKeys = bracketStructure.map(r => r.key)
+    const ri = roundKeys.indexOf(round)
+    
+    console.log('Pick called:', { round, id, winner, ri, roundKeys, currentRound: next[round] })
+    
+    if (ri !== -1 && ri < roundKeys.length - 1) {
       const mi = next[round].findIndex(m => m.id === id)
       const team = winner === 'a' ? next[round][mi].a : next[round][mi].b
-      const target = order[ri+1]
+      const target = roundKeys[ri + 1]
       const tmi = Math.floor(mi / 2)
+      
+      console.log('Advancing to next round:', { target, mi, tmi, team })
+      
       if (!next[target] || !next[target].length) {
         const needed = Math.max(1, Math.floor(next[round].length / 2))
         next[target] = Array.from({length: needed}, (_,i)=>({ id: `${target.toUpperCase()}-${i+1}`, a: null, b: null, winner: null }))
+        console.log('Created next round:', target, next[target])
       }
-      if (mi % 2 === 0) next[target][tmi].a = team
-      else next[target][tmi].b = team
+      
+      if (mi % 2 === 0) {
+        next[target][tmi].a = team
+        console.log('Set team A:', team.name, 'in match', tmi)
+      } else {
+        next[target][tmi].b = team
+        console.log('Set team B:', team.name, 'in match', tmi)
+      }
     }
+    
+    console.log('Final bracket state:', next)
     setBracket(next)
   }
 
   const champ = () => {
-    const m = bracket.f[0]
-    if (!m || !m.winner) return null
-    return m.winner === 'a' ? m.a : m.b
+    const finalMatch = bracket.f && bracket.f[0]
+    // Only declare a champion if the final match exists, has both teams, and has a winner
+    if (!finalMatch || !finalMatch.a || !finalMatch.b || !finalMatch.winner) {
+      return null
+    }
+    return finalMatch.winner === 'a' ? finalMatch.a : finalMatch.b
   }
-
-  const rounds = [
-    { key: 'r16', title: 'Round of 16' },
-    { key: 'qf', title: 'Quarterfinals' },
-    { key: 'sf', title: 'Semifinals' },
-    { key: 'f', title: 'Final' }
-  ]
 
   return (
     <div className="panel">
       <div className="panel-header">
         <h3 className="h">Knockout Bracket</h3>
+        <span className="subtle">
+          {config.format === 'direct' ? `${qualifiers.length} teams` : `${qualifiers.length} qualifiers from groups`}
+        </span>
       </div>
       <div className="bracket">
-        {rounds.map(r=>(
+        {bracketStructure.map(r=>(
           <div key={r.key} className="round">
             <div className="subtle">{r.title}</div>
             {(bracket[r.key] || []).map(m=>(
